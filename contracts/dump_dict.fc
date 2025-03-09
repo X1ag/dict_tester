@@ -1,0 +1,81 @@
+#include "imports/stdlib.fc";
+#include "utils.fc";
+
+{- 
+    CONTRACTS CAN 
+    1) ADD VALUE OF SENDER TO DICT, SENDER_HASH_ADDRESS: VALUE (OP_CODE=0X0001)
+    2) UPDATE THIS VALUE IF SENDER WANT (OP_CODE=0X0002)
+    3) DELETE VALUE OF SENDER FROM DICT (OP_CODE=0X0003)
+    4) GET VALUE OF SENDER (METHOD_ID) 
+    5) Dump that and check it 
+
+    OK LETS GO 
+-}
+
+(cell) load_data() impure {
+    slice local_storage = get_data().begin_parse();
+    cell dictionary_cell = new_dict();
+    if (~ slice_empty?(local_storage)) {
+     dictionary_cell = local_storage~load_dict();
+    } else {
+        return local_storage~load_dict();
+    }
+    return dictionary_cell;
+}
+
+() save_data(cell dict) impure {
+    set_data(
+        begin_cell()
+            .store_dict(dict) 
+        .end_cell()
+    );
+}
+
+;; recv_internal is the main function of the contract and is called when it receives a message from other contracts
+() recv_internal(int my_balance, int msg_value, cell in_msg_full, slice in_msg_body) impure {
+    if (in_msg_body.slice_empty?()) { ;; ignore all empty messages
+        return ();
+    }
+
+    slice cs = in_msg_full.begin_parse();
+    int flags = cs~load_uint(4);
+    if (flags & 1) { ;; ignore all bounced messages
+        return ();
+    }
+    slice sender_address = cs~load_msg_addr();
+    (int wc, int sender_address_hash) = parse_std_addr(sender_address);
+    force_chain(sender_address);
+
+    cell dict = load_data(); ;; here we populate the storage variables
+
+    int op = in_msg_body~load_uint(32); ;; by convention, the first 32 bits of incoming message is the op
+    int query_id = in_msg_body~load_uint(64); ;; also by convention, the next 64 bits contain the "query id", although this is not always the case
+
+    if (op == 0x0001) {
+        (slice sender_value, int f) = dict.udict_get?(256, sender_address_hash);
+        if (~ f) {
+            builder updated_msg_value_builder = begin_cell().store_uint(256, msg_value);
+            dict~udict_set_builder(256, sender_address_hash, updated_msg_value_builder);
+            save_data(dict);
+            return ();
+        } else {
+            (_, int sender_value_int) = sender_value.load_coins();
+            builder updated_msg_value_builder = begin_cell().store_uint(256, msg_value + sender_value_int);
+            dict~udict_set_builder(256, sender_address_hash, updated_msg_value_builder);
+            save_data(dict);
+            return ();
+        }
+    }
+    
+    throw(0xffff); ;; if the message contains an op that is not known to this contract, we throw
+}
+
+(slice) get_value_from_dict(int key) impure {
+    cell dict = load_data();
+    ;; (_, int address_hash) = parse_std_addr(address);
+    (slice value, int f) = dict.udict_get?(256, key);
+    throw_unless(91, f);
+    return value;
+}
+
+
