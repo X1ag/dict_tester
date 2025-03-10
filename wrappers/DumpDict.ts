@@ -28,9 +28,16 @@ export class DumpDict implements Contract {
         });
     }
 
-    async getValueByAddress(provider: ContractProvider, key: bigint) {
-        const result = (await provider.get('get_value_from_dict', [{ type: 'int', value: key }])).stack;
-        return result;
+    async sendTxAddToDict(provider: ContractProvider, via: Sender, value: bigint) {
+        await provider.internal(via, {
+            value,
+            sendMode: SendMode.PAY_GAS_SEPARATELY,
+            body: beginCell().storeUint(0x0001, 32).storeUint(123n,64).endCell(),
+        });
     }
 
+    async getValueByAddress(provider: ContractProvider, key: Cell) {
+        const result = (await provider.get('get_value_from_dict', [{ type: 'cell', cell: key }])).stack;
+        return result.readBigNumber();
+    }
 }

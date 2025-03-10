@@ -1,5 +1,5 @@
 import { Blockchain, SandboxContract, TreasuryContract } from '@ton/sandbox';
-import { Cell, toNano } from '@ton/core';
+import { address, beginCell, Cell, toNano } from '@ton/core';
 import { DumpDict } from '../wrappers/DumpDict';
 import '@ton/test-utils';
 import { compile } from '@ton/blueprint';
@@ -45,37 +45,30 @@ describe('DumpDict', () => {
         // blockchain and dumpDict are ready to use
     });
 
-    it('should increase counter', async () => {
-        const increaseTimes = 3;
-        for (let i = 0; i < increaseTimes; i++) {
-            console.log(`increase ${i + 1}/${increaseTimes}`);
+    it("should add to dict", async () => {
+        const result = await dumpDict.sendTxAddToDict(deployer.getSender(), toNano('1'))
 
-            const increaser = await blockchain.treasury('increaser' + i);
+        expect(result.transactions).toHaveTransaction({
+            from: deployer.address,
+            to: dumpDict.address,
+            success: true
+        })
+        const address_cell = beginCell().storeAddress(deployer.address).endCell();
+        const value = await dumpDict.getValueByAddress(address_cell)
+        console.log(value)
+        expect(value).toBeGreaterThanOrEqual(toNano('0.9'))
 
-            const counterBefore = await dumpDict.getCounter();
+        const result2 = await dumpDict.sendTxAddToDict(deployer.getSender(), toNano('1'))
 
-            console.log('counter before increasing', counterBefore);
+        expect(result2.transactions).toHaveTransaction({
+            from: deployer.address,
+            to:dumpDict.address,
+            success: true
+        })
 
-            const increaseBy = Math.floor(Math.random() * 100);
-
-            console.log('increasing by', increaseBy);
-
-            const increaseResult = await dumpDict.sendIncrease(increaser.getSender(), {
-                increaseBy,
-                value: toNano('0.05'),
-            });
-
-            expect(increaseResult.transactions).toHaveTransaction({
-                from: increaser.address,
-                to: dumpDict.address,
-                success: true,
-            });
-
-            const counterAfter = await dumpDict.getCounter();
-
-            console.log('counter after increasing', counterAfter);
-
-            expect(counterAfter).toBe(counterBefore + increaseBy);
-        }
+        const value2 = await dumpDict.getValueByAddress(address_cell)
+        console.log(value2)
+        expect(value2).toBeGreaterThanOrEqual(toNano('1.9'))
     });
+
 });
