@@ -4,7 +4,7 @@
 {- 
     CONTRACTS CAN 
     1) ADD VALUE OF SENDER TO DICT, SENDER_HASH_ADDRESS: VALUE (OP_CODE=0X0001)
-    3) DELETE VALUE OF SENDER FROM DICT (OP_CODE=0X0003)
+    3) DELETE VALUE OF SENDER FROM DICT (OP_CODE=0X0002)
     4) GET VALUE OF SENDER (METHOD_ID) 
     5) Dump that and check it 
 
@@ -65,6 +65,15 @@
             return ();
         }
     }
+    if (op == 0x0002) {
+        (cell updated_dict, int success) = dict.udict_delete?(256, sender_address_hash);
+        if (~ success) {
+            throw(0xfa13e);
+        }
+
+        save_data(updated_dict);
+        return ();
+    }
     
     throw(0xffff); ;; if the message contains an op that is not known to this contract, we throw
 }
@@ -75,7 +84,10 @@
     slice address = cs~load_msg_addr();
     (_, int address_hash) = parse_std_addr(address);
     (slice value, int f) = dict.udict_get?(256, address_hash);
-    throw_unless(91, f);
+
+    if (~ f) {
+        return 0;
+    } 
     return value~load_coins();
 }
 

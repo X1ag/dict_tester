@@ -70,5 +70,25 @@ describe('DumpDict', () => {
         console.log(value2)
         expect(value2).toBeGreaterThanOrEqual(toNano('1.9'))
     });
+    it("should delete sender from dict", async () => {
+        const result = await dumpDict.sendTxAddToDict(deployer.getSender(), toNano('1'))
+        expect(result.transactions).toHaveTransaction({
+            from: deployer.address,
+            to: dumpDict.address,
+            success: true
+        })
+        const address_cell = beginCell().storeAddress(deployer.address).endCell();
+        const value = await dumpDict.getValueByAddress(address_cell)
+        expect(value).toBeGreaterThanOrEqual(toNano('0.9'))
 
+        const deleteResult = await dumpDict.sendTxDeleteFromDict(deployer.getSender(), toNano('0.05'))
+
+        expect(deleteResult.transactions).toHaveTransaction({
+            from: deployer.address,
+            to: dumpDict.address,
+            success: true
+        })
+        const value2 = await dumpDict.getValueByAddress(address_cell)
+        expect(value2).toBe(0n)
+    })
 });
