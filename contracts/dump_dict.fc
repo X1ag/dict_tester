@@ -46,27 +46,24 @@
     int query_id = in_msg_body~load_uint(64); ;; also by convention, the next 64 bits contain the "query id", although this is not always the case
 
     if (op == 0x0001) {
-        (slice sender_value, int f) = dict.udict_get?(256, sender_address_hash);
+        (slice sender_value, int f) = dict.udict_get?(256, sender_address_hash); ;; (slice, int) udict_get?(cell dict, int key_len, int index) asm(index dict key_len) "DICTUGET" "NULLSWAPIFNOT";
 
-        if (~ f) {
-            builder msg_value_builder = begin_cell().store_coins(msg_value);
-            dict~udict_set_builder(256, sender_address_hash, msg_value_builder);
+        if (~ f) { ;; if the value does not exist, we create it
+            builder msg_value_builder = begin_cell().store_coins(msg_value); 
+            dict~udict_set_builder(256, sender_address_hash, msg_value_builder); ;; (cell, ()) ~udict_set_builder(cell dict, int key_len, int index, builder value) asm(value index dict key_len) "DICTUSETB";
             save_data(dict);
 
-            return ();
-        } else {
-            (_, int sender_value_int) = sender_value.load_coins();
-            builder updated_msg_value_builder = begin_cell().store_coins(msg_value + sender_value_int);
-            dict~udict_set_builder(256, sender_address_hash, updated_msg_value_builder);
-            save_data(dict);
-            
-            ;; int value = (updated_msg_value_builder.end_cell())~load_coins();
-            ;; ~dump(value);
             return ();
         }
+        (_, int sender_value_int) = sender_value.load_coins();
+        builder updated_msg_value_builder = begin_cell().store_coins(msg_value + sender_value_int); ;; update the value
+        dict~udict_set_builder(256, sender_address_hash, updated_msg_value_builder); ;; (cell, ()) ~udict_set_builder(cell dict, int key_len, int index, builder value) asm(value index dict key_len) "DICTUSETB";
+        save_data(dict); 
+        
+        return ();
     }
     if (op == 0x0002) {
-        (cell updated_dict, int success) = dict.udict_delete?(256, sender_address_hash);
+        (cell updated_dict, int success) = dict.udict_delete?(256, sender_address_hash); ;; delete the value; (cell, int) udict_delete?(cell dict, int key_len, int index) asm(index dict key_len) "DICTUDEL"
         if (~ success) {
             throw(0xfa13e);
         }
@@ -85,10 +82,10 @@
     (_, int address_hash) = parse_std_addr(address);
     (slice value, int f) = dict.udict_get?(256, address_hash);
 
-    if (~ f) {
+    if (~ f) { ;; if not found
         return 0;
     } 
-    return value~load_coins();
+    return value~load_coins(); ;; else return the value
 }
 
 
